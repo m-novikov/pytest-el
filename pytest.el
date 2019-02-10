@@ -1,6 +1,7 @@
+;; -*- lexical-binding: t -*-
 ;;; pytest.el --- Easy Python test running in Emacs
-
 ;; Copyright (C) 2009 Eric Larson
+;; Copyright (C) 2019 Maksim Novikov
 
 ;; Licensed under the same terms as Emacs.
 
@@ -258,7 +259,7 @@ case.  This requires pytest >= 1.2."
     (re-search-backward
      "^\\(class\\|\\(?:async \\)?def\\)[ \t]+\\([a-zA-Z0-9_]+\\)" nil t)
     (let ((result
-            (buffer-substring-no-properties (match-beginning 2) (match-end 2))))
+           (buffer-substring-no-properties (match-beginning 2) (match-end 2))))
       (cons
        (buffer-substring-no-properties (match-beginning 1) (match-end 1))
        result))))
@@ -270,8 +271,8 @@ case.  This requires pytest >= 1.2."
            (file-name-directory buffer-file-name))))
     (cond ((funcall pytest-project-root-test dn) (expand-file-name dn))
           ((equal (expand-file-name dn) "/") nil)
-        (t (pytest-find-project-root
-             (file-name-directory (directory-file-name dn)))))))
+          (t (pytest-find-project-root
+              (file-name-directory (directory-file-name dn)))))))
 
 (defun pytest-project-root (dirname)
   (reduce '(lambda (x y) (or x y))
@@ -282,6 +283,59 @@ case.  This requires pytest >= 1.2."
   (if (not (buffer-file-name))
       (expand-file-name default-directory)
     (file-name-directory (expand-file-name (buffer-file-name)))))
+
+(cl-defstruct (pytest--pydef
+               (:constructor pytest--pydef--create)
+               (:copier nil))
+  indent is-class name)
+
+(cl-defun pytest--pydef-create (&key indent type name)
+  (pytest--pydef--create
+   :indent (length indent)
+   :is-class (string= "class" type)
+   :name name))
+
+(defun pytest--make-next-pydef-regex (cur-indent)
+  (format
+   "^\\([\s\t]\\{,%d\\}\\)\\(?:async \\)?\\(def\\|class\\) \\([a-z_]+\\)"
+   (- cur-indent 1)))
+
+(defun pytest--pydef-from-last-match ()
+  (pytest--pydef-create
+    :indent (match-string-no-properties 1)
+    :type (match-string-no-properties 2)
+    :name (match-string-no-properties 3)))
+
+(defun pytest--last-indent (defs)
+  (pytest--pydef-indent (car defs)))
+
+(defun pytest--next-pydef-regex (defs)
+  (pytest--make-next-pydef-regex (pytest--last-indent defs)))
+
+(defun pytest--definition-stack ()
+  (save-excursion
+    (let (defs expr)
+                                        ; find first candidate should always be function
+      (unless (re-search-backward "^\\([\s\t]*\\)\\(?:async \\)?\\(def\\) \\([a-z_]+\\)" nil t)
+        (error "Failed to find test function"))
+      (push (pytest--pydef-from-last-match) defs)
+      (while (and (> (pytest--last-indent defs) 0)
+                  (re-search-backward (pytest--next-pydef-regex defs) nil t))
+        (push (pytest--pydef-from-last-match) defs))
+      defs)))
+
+(defun pytest-test-name ()
+  (let ((def-stack (pytest--definition-stack)))
+    (let ((class-path
+           (mapconcat 'pytest--pydef-name
+                      (seq-take-while 'pytest--pydef-is-class def-stack) "::")))
+      (format "%s::%s%s"
+              (buffer-file-name)
+              (if (= (length class-path) 0) "" (format "%s::" class-path))
+              (pytest--pydef-name
+               (seq-find (lambda (def)
+                           (not (pytest--pydef-is-class def)))
+                         def-stack))))))
 
 (provide 'pytest)
 
