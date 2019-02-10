@@ -18,7 +18,7 @@ class TestA:
         # inside_class_method
         pass
 
-    class TestB:
+    class TestInner:
         # inside_inner_class
 
         def test_false(self):
@@ -27,9 +27,6 @@ class TestA:
 
 
 if True:
-    def test_true():
-        pass
-
-if False:
-    def test_false():
+    def test_under():
+        # under_flag
         pass

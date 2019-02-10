@@ -309,33 +309,33 @@ case.  This requires pytest >= 1.2."
 (defun pytest--last-indent (defs)
   (pytest--pydef-indent (car defs)))
 
-(defun pytest--next-pydef-regex (defs)
-  (pytest--make-next-pydef-regex (pytest--last-indent defs)))
-
 (defun pytest--definition-stack ()
   (save-excursion
-    (let (defs expr)
-                                        ; find first candidate should always be function
-      (unless (re-search-backward "^\\([\s\t]*\\)\\(?:async \\)?\\(def\\) \\([a-z_]+\\)" nil t)
-        (error "Failed to find test function"))
-      (push (pytest--pydef-from-last-match) defs)
-      (while (and (> (pytest--last-indent defs) 0)
-                  (re-search-backward (pytest--next-pydef-regex defs) nil t))
-        (push (pytest--pydef-from-last-match) defs))
+    (let ((defs nil)
+          (last-indent 99))
+
+      (while (and (> last-indent 0)
+                  (re-search-backward (pytest--make-next-pydef-regex last-indent) nil t))
+        (push (pytest--pydef-from-last-match) defs)
+        (setq last-indent (pytest--last-indent defs)))
       defs)))
+
+(defun pytest--pydef-maybe-name (def)
+  (if def (format "::%s" (pytest--pydef-name def)) ""))
 
 (defun pytest-test-name ()
   (let ((def-stack (pytest--definition-stack)))
     (let ((class-path
            (mapconcat 'pytest--pydef-name
                       (seq-take-while 'pytest--pydef-is-class def-stack) "::")))
-      (format "%s::%s%s"
+      (format "%s%s%s"
               (buffer-file-name)
-              (if (= (length class-path) 0) "" (format "%s::" class-path))
-              (pytest--pydef-name
+              (if (= (length class-path) 0) "" (format "::%s" class-path))
+              (pytest--pydef-maybe-name
                (seq-find (lambda (def)
                            (not (pytest--pydef-is-class def)))
                          def-stack))))))
+
 
 (provide 'pytest)
 
