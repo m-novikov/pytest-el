@@ -23,7 +23,7 @@ class TestA:
 
         def test_false(self):
             # inside_innerclass_func
-            assert False
+            assert True
 
 
 if True:

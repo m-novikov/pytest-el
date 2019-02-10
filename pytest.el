@@ -91,6 +91,9 @@
 (defcustom pytest-cmd-format-string "cd '%s' && %s %s '%s'"
   "Format string used to run the py.test command.")
 
+(defvar pytest--last-run nil
+  "Store last run arguments")
+
 (defun pytest-cmd-format (format-string working-directory test-runner command-flags test-names)
   "Create the string used for running the py.test command.
 FORMAT-STRING is a template string used by (format) to compose
@@ -115,6 +118,7 @@ The function returns a string used to run the py.test command.  Here's an exampl
 Optional argument TESTS Tests to run.
 Optional argument FLAGS py.test command line flags."
   (interactive "fTest directory or file: \nspy.test flags: ")
+  (setq pytest--last-run (list tests flags))
   (let* ((pytest (pytest-find-test-runner))
          (where (if tests
                     (let ((testpath (if (listp tests) (car tests) tests)))
@@ -131,8 +135,14 @@ Optional argument FLAGS py.test command line flags."
                                     (lambda (mode) (concat (pytest-get-temp-buffer-name)))))
              (pytest-cmd-format pytest-cmd-format-string where pytest cmd-flags tnames))
     (if use-comint
-	(with-current-buffer (get-buffer (pytest-get-temp-buffer-name))
-	  (inferior-python-mode)))))
+	      (with-current-buffer (get-buffer (pytest-get-temp-buffer-name))
+	        (inferior-python-mode)))))
+
+(defun pytest-again ()
+  (interactive)
+  (unless pytest--last-run
+    (error "There is no recorded last pytest invocaton"))
+  (apply 'pytest-run pytest--last-run))
 
 (defun pytest-get-temp-buffer-name ()
   "Get name of temporary buffer.
@@ -199,7 +209,7 @@ Optional argument FLAGS py.test command line flags."
   "Run pytest (via eggs/bin/test) on testable thing at point in current buffer.
 Optional argument FLAGS py.test command line flags."
   (interactive)
-  (pytest-run (format "%s" (pytest-py-testable)) flags))
+  (pytest-run (format "%s" (pytest-test-name)) flags))
 
 ;;;###autoload
 (defun pytest-pdb-one ()
@@ -225,44 +235,10 @@ Optional argument FLAGS py.test command line flags."
 (defun pytest-find-test-runner-in-dir-named (dn runner)
   (let ((fn (expand-file-name runner dn)))
     (cond ((file-regular-p fn) fn)
-      ((equal dn "/") nil)
-      (t (pytest-find-test-runner-in-dir-named
-          (file-name-directory (directory-file-name dn))
-          runner)))))
-
-(defun pytest-py-testable ()
-  "Create a path to a test.
-This uses the `::` delimiter between the
-filename, class and method in order to find the specific test
-case.  This requires pytest >= 1.2."
-  (let* ((inner-obj (pytest-inner-testable))
-         (outer (pytest-outer-testable))
-         ;; elisp can't return multiple values
-         (outer-def (car outer))
-         (outer-obj (cdr outer)))
-    (concat
-     (buffer-file-name)
-     (cond ((equal outer-def "def") (format "::%s" outer-obj))
-       ((equal inner-obj outer-obj) (format "::%s" outer-obj))
-       (t (format "::%s::%s" outer-obj inner-obj))))))
-
-(defun pytest-inner-testable ()
-  "Find the function name for `pytest-one'."
-  (save-excursion
-    (re-search-backward
-     "^[ \t]\\{0,4\\}\\(class\\|\\(?:async \\)?def\\)[ \t]+\\([a-zA-Z0-9_]+\\)" nil t)
-    (buffer-substring-no-properties (match-beginning 2) (match-end 2))))
-
-(defun pytest-outer-testable ()
-  "Find the class for the `pytest-one'."
-  (save-excursion
-    (re-search-backward
-     "^\\(class\\|\\(?:async \\)?def\\)[ \t]+\\([a-zA-Z0-9_]+\\)" nil t)
-    (let ((result
-           (buffer-substring-no-properties (match-beginning 2) (match-end 2))))
-      (cons
-       (buffer-substring-no-properties (match-beginning 1) (match-end 1))
-       result))))
+          ((equal dn "/") nil)
+          (t (pytest-find-test-runner-in-dir-named
+              (file-name-directory (directory-file-name dn))
+              runner)))))
 
 (defun pytest-find-project-root (&optional dirname)
   (let ((dn
@@ -302,9 +278,9 @@ case.  This requires pytest >= 1.2."
 
 (defun pytest--pydef-from-last-match ()
   (pytest--pydef-create
-    :indent (match-string-no-properties 1)
-    :type (match-string-no-properties 2)
-    :name (match-string-no-properties 3)))
+   :indent (match-string-no-properties 1)
+   :type (match-string-no-properties 2)
+   :name (match-string-no-properties 3)))
 
 (defun pytest--last-indent (defs)
   (pytest--pydef-indent (car defs)))
