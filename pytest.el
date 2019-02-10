@@ -330,20 +330,17 @@ Optional argument FLAGS py.test command line flags."
 (defun pytest--run-selected (candidate)
   (pytest-run (helm-marked-candidates)))
 
-(defun pytest-buffer-tests ()
+(defun pytest-helm-buffer-tests ()
   (interactive)
   (let ((filename (buffer-file-name)))
     (helm :sources (helm-build-async-source "pytest-names"
                      :action '(("Run Test" . pytest--run-selected))
                      :candidate-transformer (lambda (candidates)
-                                              (cl-loop for c in candidates
-                                                       when (string-match (format "^%s" filename) c)
-                                                       collect c))
+                                              (seq-filter (lambda (el) (string-match "::" el)) candidates))
                      :candidates-process
                      (lambda ()
                        (start-process "pytest-names" nil "pytest" "-q" "--collect-only" filename)))
-          :buffer "*helm pytest names*"
-          )))
+          :buffer "*helm pytest names*")))
 
 (provide 'pytest)
 

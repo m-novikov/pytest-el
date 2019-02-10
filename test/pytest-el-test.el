@@ -18,8 +18,9 @@
   (locate-test "def inner_func")
   (let ((start (point)))
     (should (string-match "test_sample.py::test_func_with_inner$" (pytest-test-name)))
-    (should (eq start (point))))
+    (should (eq start (point)))))
 
+(ert-deftest test-with-inner-func-2 ()
   (locate-test "inside_inner")
   (let ((start (point)))
     (should (string-match "test_sample.py::test_func_with_inner$" (pytest-test-name)))
@@ -38,7 +39,7 @@
     (should (eq start (point)))))
 
 (ert-deftest test-nested-class-method ()
-  (locate-test "inside_innerclass_func")
+  (locate-test "inside_inner_class_func")
   (let ((start (point)))
     (should (string-match
              "test_sample.py::TestA::TestInner::test_false$"

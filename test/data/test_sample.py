@@ -22,7 +22,7 @@ class TestA:
         # inside_inner_class
 
         def test_false(self):
-            # inside_innerclass_func
+            # inside_inner_class_func
             assert True
 
 
