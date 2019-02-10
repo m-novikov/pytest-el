@@ -88,11 +88,14 @@
 (defcustom pytest-cmd-flags "-x -s"
   "These are the flags passed to the pytest runner.")
 
-(defcustom pytest-cmd-format-string "cd '%s' && %s %s '%s'"
+(defcustom pytest-cmd-format-string "cd '%s' && %s %s %s"
   "Format string used to run the py.test command.")
 
 (defvar pytest--last-run nil
   "Store last run arguments")
+
+(defvar pytest--marks nil
+  "List of tests to run")
 
 (defun pytest-cmd-format (format-string working-directory test-runner command-flags test-names)
   "Create the string used for running the py.test command.
@@ -312,6 +315,35 @@ Optional argument FLAGS py.test command line flags."
                            (not (pytest--pydef-is-class def)))
                          def-stack))))))
 
+(defun pytest-marks-clear ()
+  (interactive)
+  (setq pytest--marks nil))
+
+(defun pytest-marks-push ()
+  (interactive)
+  (push (pytest-test-name) pytest--marks))
+
+(defun pytest-marks-run ()
+  (interactive)
+  (pytest-run pytest--marks))
+
+(defun pytest--run-selected (candidate)
+  (pytest-run (helm-marked-candidates)))
+
+(defun pytest-buffer-tests ()
+  (interactive)
+  (let ((filename (buffer-file-name)))
+    (helm :sources (helm-build-async-source "pytest-names"
+                     :action '(("Run Test" . pytest--run-selected))
+                     :candidate-transformer (lambda (candidates)
+                                              (cl-loop for c in candidates
+                                                       when (string-match (format "^%s" filename) c)
+                                                       collect c))
+                     :candidates-process
+                     (lambda ()
+                       (start-process "pytest-names" nil "pytest" "-q" "--collect-only" filename)))
+          :buffer "*helm pytest names*"
+          )))
 
 (provide 'pytest)
 
