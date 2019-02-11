@@ -141,6 +141,7 @@ Optional argument FLAGS py.test command line flags."
 	      (with-current-buffer (get-buffer (pytest-get-temp-buffer-name))
 	        (inferior-python-mode)))))
 
+;;;###autoload
 (defun pytest-again ()
   (interactive)
   (unless pytest--last-run
@@ -315,14 +316,17 @@ Optional argument FLAGS py.test command line flags."
                            (not (pytest--pydef-is-class def)))
                          def-stack))))))
 
+;;;###autoload
 (defun pytest-marks-clear ()
   (interactive)
   (setq pytest--marks nil))
 
+;;;###autoload
 (defun pytest-marks-push ()
   (interactive)
   (push (pytest-test-name) pytest--marks))
 
+;;;###autoload
 (defun pytest-marks-run ()
   (interactive)
   (pytest-run pytest--marks))
@@ -330,6 +334,7 @@ Optional argument FLAGS py.test command line flags."
 (defun pytest--run-selected (candidate)
   (pytest-run (helm-marked-candidates)))
 
+;;;###autoload
 (defun pytest-helm-buffer-tests ()
   (interactive)
   (let ((filename (buffer-file-name)))
